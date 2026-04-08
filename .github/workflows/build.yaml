@@ -39,10 +39,10 @@ jobs:
         uses: extractions/setup-just@v3
 
       - name: Build image
-        run: sudo just build
+        run: sudo $(which just) build
 
       - name: Rechunk image
-        run: sudo just rechunk
+        run: sudo $(which just) rechunk
 
       - name: Login to GHCR
         if: github.event_name != 'pull_request'

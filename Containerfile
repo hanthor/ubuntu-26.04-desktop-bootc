@@ -42,12 +42,33 @@ RUN --mount=type=tmpfs,dst=/tmp --mount=type=tmpfs,dst=/root --mount=type=tmpfs,
     apt-get clean -y && \
     rm -rf /var/lib/apt/lists/*
 
-# Full Ubuntu desktop (GNOME 50). ubuntu-desktop pulls linux-generic → linux-image-generic
-# (kernel 7.0) and writes vmlinuz to /boot, which we copy before the tmpfs vanishes.
-RUN --mount=type=tmpfs,dst=/tmp --mount=type=tmpfs,dst=/root --mount=type=tmpfs,dst=/boot \
-    apt-get update -y && \
-    apt-get install -y ubuntu-desktop && \
-    cp /boot/vmlinuz-* "$(find /usr/lib/modules -maxdepth 1 -type d | tail -n 1)/vmlinuz" && \
+# Stub out kernel/grub/kdump post-install hooks that fail in a container.
+# We generate the initramfs ourselves with dracut in a later step.
+RUN printf '#!/bin/sh\nexit 0\n' > /usr/sbin/update-initramfs && \
+    chmod +x /usr/sbin/update-initramfs && \
+    printf '#!/bin/sh\nexit 0\n' > /usr/sbin/mkinitramfs && \
+    chmod +x /usr/sbin/mkinitramfs && \
+    printf '#!/bin/sh\nexit 0\n' > /usr/sbin/update-grub && \
+    chmod +x /usr/sbin/update-grub && \
+    printf '#!/bin/sh\nexit 0\n' > /usr/sbin/grub-mkconfig && \
+    chmod +x /usr/sbin/grub-mkconfig && \
+    mkdir -p /etc/kernel/postinst.d && \
+    printf '#!/bin/sh\nexit 0\n' > /etc/kernel/postinst.d/kdump-tools && \
+    chmod +x /etc/kernel/postinst.d/kdump-tools
+
+# Minimal GNOME 50 desktop + kernel 7.0. No LibreOffice — apps go in as flatpaks.
+# Hooks are stubbed above so the kernel post-install won't crash crun.
+# DEBIAN_FRONTEND set inline (--isolation=chroot doesn't inherit ENV).
+# --force-confold avoids interactive conffile prompts for our stubbed hooks.
+RUN --mount=type=tmpfs,dst=/root \
+    DEBIAN_FRONTEND=noninteractive \
+    apt-get -o Dpkg::Options::="--force-confold" update -y && \
+    DEBIAN_FRONTEND=noninteractive \
+    apt-get -o Dpkg::Options::="--force-confold" \
+        install -y --install-recommends ubuntu-desktop-minimal linux-generic && \
+    KVER=$(find /usr/lib/modules -maxdepth 1 -mindepth 1 -type d | sort -V | tail -1 | xargs basename) && \
+    cp "/boot/vmlinuz-${KVER}" "/usr/lib/modules/${KVER}/vmlinuz" && \
+    rm -rf /boot/* && \
     apt-get clean -y && \
     rm -rf /var/lib/apt/lists/*
 

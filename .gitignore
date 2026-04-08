@@ -1,2 +1,6 @@
 bootable.img
 *.img
+boot.log
+build.log
+recipe.json
+fisherman

@@ -1,26 +1,34 @@
 # ubuntu-26.04-desktop-bootc
 
-A bootc-compatible container image for **Ubuntu 26.04 LTS "Resolute Raccoon"** with the full GNOME 50 desktop environment and kernel 7.0.
+A [bootc](https://github.com/bootc-dev/bootc)-compatible container image for **Ubuntu 26.04 LTS "Resolute Raccoon"** — GNOME 50 desktop, kernel 7.0, ZFS support, and Plymouth boot splash.
 
-Based on the approach from [bootcrew/mono](https://github.com/bootcrew/mono), this image builds [bootc](https://github.com/bootc-dev/bootc) from source and wires it into an Ubuntu 26.04 base with a complete desktop stack.
+The image is designed to be installed from the companion live ISO ([tuna-os/ubuntu-26.04-iso](https://github.com/tuna-os/ubuntu-26.04-iso)) via the tuna-installer, with **ZFS root** or btrfs as the target filesystem.
 
 ## What's inside
 
-| Component | Version |
+| Component | Details |
 |-----------|---------|
-| Base OS   | Ubuntu 26.04 LTS (Resolute Raccoon) |
-| Desktop   | GNOME 50 (via `ubuntu-desktop`) |
-| Kernel    | Linux 7.0 (via `linux-image-generic`) |
-| Init      | systemd |
+| Base OS | Ubuntu 26.04 LTS "Resolute Raccoon" |
+| Desktop | GNOME 50 (`ubuntu-desktop-minimal`) |
+| Kernel | Linux 7.0 (`linux-generic`) |
+| Init | systemd |
 | Bootloader | systemd-boot |
-| Initramfs | dracut (bootc module, zstd compressed) |
-| Filesystem | composefs (sysroot read-only) |
+| Initramfs | dracut (bootc module, zstd-compressed, `hostonly=no`) |
+| Sysroot | composefs (read-only, overlaid at runtime) |
+| ZFS | OpenZFS 2.x (`zfsutils-linux`, `zfs-dracut`, kernel module) |
+| Plymouth | `spinner` theme (boot splash) |
+| Flatpak | Flathub remote pre-configured via `/etc/flatpak/remotes.d/` |
+| First-run | `gnome-initial-setup` (Ubuntu edition) |
+| Remote access | `openssh-server` |
+| Privilege | `sudo` |
+| bootc | Built from source (Rust/cargo) |
 
 ## Requirements
 
-- [Podman](https://podman.io/) or Docker
+- [Podman](https://podman.io/) ≥ 4.5
 - [just](https://just.systems/)
-- A Linux host with at least 30 GB free disk space for the build
+- Linux host, x86_64
+- At least 30 GB free disk space (build + layer cache)
 
 ## Build
 
@@ -28,31 +36,30 @@ Based on the approach from [bootcrew/mono](https://github.com/bootcrew/mono), th
 just build
 ```
 
-This produces a local image tagged `ubuntu-26.04-desktop-bootc:latest`.
+This produces `localhost/ubuntu-26.04-desktop-bootc:latest`.
 
-## Create a bootable disk image
+The build is multi-stage and takes 20–40 minutes on first run (Rust compilation). Subsequent builds are fast thanks to layer caching.
+
+## Create a bootable raw disk image
 
 ```bash
-# Creates bootable.img (20 GB raw disk) in the current directory
-just disk-image
+just disk-image          # creates bootable.img (20 GB) via bootc install to-disk
 ```
 
-You can then write it to a USB drive or boot it in a VM:
+Flash to USB or boot in QEMU:
 
 ```bash
-# Write to a USB drive (replace /dev/sdX)
+# Flash
 sudo dd if=bootable.img of=/dev/sdX bs=4M status=progress conv=fsync
 
-# Boot in QEMU (UEFI)
+# QEMU (UEFI — Secure Boot not required)
 qemu-system-x86_64 \
   -enable-kvm -m 4096 -smp 2 \
-  -bios /usr/share/ovmf/OVMF.fd \
+  -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE.fd \
   -drive format=raw,file=bootable.img
 ```
 
-## Update a running system
-
-On a booted system, pull and apply an updated image:
+## OTA updates on a running system
 
 ```bash
 sudo bootc upgrade
@@ -64,21 +71,27 @@ sudo bootc upgrade
 just rechunk
 ```
 
+Produces a maximally layer-deduplicated image suitable for GHCR distribution.
+
 ## CI / Publishing
 
-GitHub Actions builds multi-arch images (`amd64` + `arm64`) and pushes to GHCR on every push to `main`. Weekly scheduled rebuilds pick up upstream package updates.
-
-To enable image signing, add a `SIGNING_SECRET` repository secret containing your cosign private key.
+GitHub Actions builds and pushes `ghcr.io/hanthor/ubuntu-26.04-desktop-bootc:latest` on every push to `main`. Weekly rebuilds pick up upstream Ubuntu package updates.
 
 ## Project layout
 
 ```
-Containerfile       — multi-stage build definition
-Justfile            — local build / disk-image helpers
+Containerfile
+│  Multi-stage build:
+│    ctx      — build context (shared scripts)
+│    base     — ubuntu:26.04 base
+│    builder  — Rust toolchain + bootc source compile
+│    system   — installs GNOME 50, kernel 7.0, ZFS, Plymouth, Flatpak
+│
 shared/
-  build.sh          — compiles bootc from source
-  initramfs.sh      — generates dracut initramfs with bootc module
-  bootc-rootfs.sh   — sets up the ostree/composefs filesystem layout
-.github/workflows/
-  build.yaml        — CI: build, rechunk, publish, sign
+  build.sh         — compiles bootc from source (cargo install)
+  initramfs.sh     — builds dracut initramfs with bootc + ZFS modules
+  bootc-rootfs.sh  — sets up the bootc/composefs filesystem layout
+                     (wipes /var, creates ostree symlinks)
+Justfile           — build / disk-image / rechunk helpers
+recipe.json        — fisherman recipe for tuna-installer disk install
 ```

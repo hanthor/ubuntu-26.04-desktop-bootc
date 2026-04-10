@@ -29,6 +29,15 @@ printf '%s\n' \
 printf 'd /var/roothome 0700 root root -\nd /run/media 0755 root root -\n' \
     | tee -a /usr/lib/tmpfiles.d/bootc-base-dirs.conf
 
+# Ubuntu packages expect these /var/lib subdirs to exist at runtime.
+# Since /var is a separate ZFS dataset (starts empty on first boot),
+# create them via tmpfiles.d so systemd-tmpfiles-setup.service handles it.
+printf '%s\n' \
+    "d /var/lib/update-notifier 0755 root root -" \
+    "d /var/lib/ubuntu-advantage 0755 root root -" \
+    "d /var/lib/apport 0755 root root -" \
+    | tee -a /usr/lib/tmpfiles.d/bootc-base-dirs.conf
+
 # Enable composefs and read-only sysroot for bootc
 printf '[composefs]\nenabled = yes\n[sysroot]\nreadonly = true\n' \
     | tee /usr/lib/ostree/prepare-root.conf

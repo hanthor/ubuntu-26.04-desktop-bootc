@@ -28,12 +28,17 @@ RUN --mount=type=tmpfs,dst=/tmp --mount=type=tmpfs,dst=/root --mount=type=tmpfs,
     apt-get update -y && \
     apt-get install -y \
         btrfs-progs \
+        curl \
         dosfstools \
         dracut \
         e2fsprogs \
         fdisk \
+        flatpak \
         libostree-dev \
         linux-firmware \
+        plymouth \
+        plymouth-themes \
+        rsync \
         skopeo \
         systemd \
         systemd-boot \
@@ -41,6 +46,14 @@ RUN --mount=type=tmpfs,dst=/tmp --mount=type=tmpfs,dst=/root --mount=type=tmpfs,
         xfsprogs && \
     apt-get clean -y && \
     rm -rf /var/lib/apt/lists/*
+
+# Pre-configure Flathub as a system remote.
+# /var/lib/flatpak is mutable at runtime (not part of the image), so we cannot
+# call `flatpak remote-add` here.  Instead, drop the .flatpakrepo file into
+# /etc/flatpak/remotes.d/ — flatpak auto-discovers and registers it on first use.
+RUN mkdir -p /etc/flatpak/remotes.d && \
+    curl --retry 3 -Lo /etc/flatpak/remotes.d/flathub.flatpakrepo \
+        https://dl.flathub.org/repo/flathub.flatpakrepo
 
 # Stub out kernel/grub/kdump post-install hooks that fail in a container.
 # We generate the initramfs ourselves with dracut in a later step.
@@ -72,7 +85,37 @@ RUN --mount=type=tmpfs,dst=/root \
     apt-get clean -y && \
     rm -rf /var/lib/apt/lists/*
 
+# ZFS root support — tools, kernel module, dracut integration, and event daemon.
+# zfs-dracut installs /usr/lib/dracut/modules.d/90zfs which the initramfs.sh step uses.
+# linux-modules-zfs-generic provides the ZFS .ko for the generic kernel we install above.
+# Enable the ZFS systemd units so an installed ZFS-root system boots correctly:
+#   - zfs-import-scan.service  — scans for pools (correct for generic hostonly=no initramfs
+#                                that cannot embed a machine-specific /etc/zfs/zpool.cache)
+#   - zfs-mount.service        — mounts additional datasets (var, etc.) after initramfs
+#   - zfs-zed.service          — ZFS Event Daemon (scrub, trim, events)
+# NOTE: zfs-import-cache.service is NOT enabled here because the installed system's
+# /etc/zfs/zpool.cache is written by zfs-install.sh post-install, and the prebuilt
+# generic initramfs (hostonly=no) cannot include it. scan is the reliable first-boot path.
+RUN --mount=type=tmpfs,dst=/tmp --mount=type=tmpfs,dst=/root \
+    apt-get update -y && \
+    apt-get install -y \
+        gnome-initial-setup \
+        linux-modules-zfs-generic \
+        sudo-rs \
+        zfs-dracut \
+        zfs-zed \
+        zfsutils-linux \
+        openssh-server && \
+    # ubuntu-desktop-minimal installs both gnome-terminal and ptyxis; keep only ptyxis.
+    apt-get remove -y gnome-terminal && \
+    systemctl enable --root / \
+        zfs-import-scan.service \
+        zfs-mount.service \
+        zfs-zed.service && \
+    apt-get clean -y && rm -rf /var/lib/apt/lists/*
+
 # Build the bootc-compatible initramfs with dracut
+# zfs-dracut must be installed before this step so the 'zfs' dracut module is available.
 RUN --mount=type=tmpfs,dst=/tmp --mount=type=tmpfs,dst=/root \
     --mount=type=bind,from=ctx,source=/,target=/ctx \
     /ctx/shared/initramfs.sh
@@ -83,5 +126,9 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     /ctx/shared/bootc-rootfs.sh
 
 LABEL containers.bootc 1
+
+# Test/debug: set a known root password so serial console login works during install testing.
+# TODO: remove or replace with proper user provisioning before production release.
+RUN echo 'root:root' | chpasswd
 
 RUN bootc container lint

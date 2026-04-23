@@ -29,6 +29,7 @@ RUN --mount=type=tmpfs,dst=/tmp --mount=type=tmpfs,dst=/root --mount=type=tmpfs,
     apt-get install -y \
         btrfs-progs \
         curl \
+        dbus \
         dosfstools \
         dracut \
         e2fsprogs \
@@ -124,6 +125,28 @@ RUN --mount=type=tmpfs,dst=/tmp --mount=type=tmpfs,dst=/root \
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     echo "HOME=/var/home" | tee -a "/etc/default/useradd" && \
     /ctx/shared/bootc-rootfs.sh
+
+# ── Flatpak pre-install layer ──────────────────────────────────────────────────
+# Pre-install flatpaks into /var/lib/flatpak at build time.
+# Uses --mount=type=cache to persist the ostree repo across local builds.
+# CI always starts cold, but local builds only download deltas.
+#
+# bootc-rootfs.sh wipes /var, so we must install flatpaks AFTER it runs
+# so the repo survives into the live squashfs layer.
+RUN --mount=type=cache,target=/var/cache/flatpak-dl,id=ubuntu2604-flatpak \
+    mkdir -p /run/dbus && \
+    dbus-daemon --system --fork --nopidfile && \
+    sleep 1 && \
+    flatpak remote-add --system --if-not-exists flathub \
+        https://dl.flathub.org/repo/flathub.flatpakrepo && \
+    # bootc-installer via GitHub Releases (not Flathub)
+    curl --retry 3 --location \
+        "https://github.com/tuna-os/tuna-installer/releases/download/continuous/org.bootcinstaller.Installer.flatpak" \
+        -o /tmp/tuna-installer.flatpak && \
+    flatpak install --system --noninteractive --bundle /tmp/tuna-installer.flatpak || \
+        flatpak update --system --noninteractive org.bootcinstaller.Installer && \
+    rm /tmp/tuna-installer.flatpak && \
+    flatpak override --system --filesystem=/etc:ro org.bootcinstaller.Installer
 
 LABEL containers.bootc 1
 

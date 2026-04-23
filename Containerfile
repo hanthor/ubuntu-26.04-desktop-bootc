@@ -127,15 +127,15 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     /ctx/shared/bootc-rootfs.sh
 
 # ── Flatpak pre-install layer ──────────────────────────────────────────────────
-# Pre-install flatpaks into /var/lib/flatpak at build time.
-# Uses --mount=type=cache to persist the ostree repo across local builds.
-# CI always starts cold, but local builds only download deltas.
+# Pre-install the tuna-installer flatpak (without runtimes) into the base image.
+# Runtimes will be downloaded on first launch when needed.
+# This keeps the image smaller while ensuring the installer is available.
 #
 # bootc-rootfs.sh wipes /var, so we must install flatpaks AFTER it runs
-# so the repo survives into the live squashfs layer.
+# so the /var/lib/flatpak repo survives into the squashfs layer.
 #
 # TMPDIR=CACHE workaround: overlayfs inside Podman builds doesn't support O_TMPFILE.
-# The --mount=type=cache volume is a bind-mount from btrfs and supports O_TMPFILE.
+# Use the cache mount point which is on btrfs and supports O_TMPFILE.
 RUN --mount=type=cache,target=/var/cache/flatpak-dl,id=ubuntu2604-flatpak \
     mkdir -p /var/cache/flatpak-dl/tmp /run/dbus && \
     export TMPDIR=/var/cache/flatpak-dl/tmp && \
@@ -143,12 +143,13 @@ RUN --mount=type=cache,target=/var/cache/flatpak-dl,id=ubuntu2604-flatpak \
     sleep 1 && \
     flatpak remote-add --system --if-not-exists flathub \
         https://dl.flathub.org/repo/flathub.flatpakrepo && \
-    # bootc-installer via GitHub Releases (not Flathub)
+    # Download and install stable or dev tuna-installer without dependencies
+    RELEASE_TAG="continuous" && \
+    FLATPAK_FILENAME="org.bootcinstaller.Installer.flatpak" && \
     curl --retry 3 --location \
-        "https://github.com/tuna-os/tuna-installer/releases/download/continuous/org.bootcinstaller.Installer.flatpak" \
+        "https://github.com/tuna-os/tuna-installer/releases/download/${RELEASE_TAG}/${FLATPAK_FILENAME}" \
         -o /var/cache/flatpak-dl/tuna-installer.flatpak && \
-    flatpak install --system --noninteractive --bundle /var/cache/flatpak-dl/tuna-installer.flatpak || \
-        flatpak update --system --noninteractive org.bootcinstaller.Installer && \
+    flatpak install --system --noninteractive --no-deps --bundle /var/cache/flatpak-dl/tuna-installer.flatpak && \
     rm /var/cache/flatpak-dl/tuna-installer.flatpak && \
     flatpak override --system --filesystem=/etc:ro org.bootcinstaller.Installer
 

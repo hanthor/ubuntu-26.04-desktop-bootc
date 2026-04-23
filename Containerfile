@@ -133,8 +133,12 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
 #
 # bootc-rootfs.sh wipes /var, so we must install flatpaks AFTER it runs
 # so the repo survives into the live squashfs layer.
+#
+# TMPDIR=CACHE workaround: overlayfs inside Podman builds doesn't support O_TMPFILE.
+# The --mount=type=cache volume is a bind-mount from btrfs and supports O_TMPFILE.
 RUN --mount=type=cache,target=/var/cache/flatpak-dl,id=ubuntu2604-flatpak \
-    mkdir -p /run/dbus && \
+    mkdir -p /var/cache/flatpak-dl/tmp /run/dbus && \
+    export TMPDIR=/var/cache/flatpak-dl/tmp && \
     dbus-daemon --system --fork --nopidfile && \
     sleep 1 && \
     flatpak remote-add --system --if-not-exists flathub \
@@ -142,10 +146,10 @@ RUN --mount=type=cache,target=/var/cache/flatpak-dl,id=ubuntu2604-flatpak \
     # bootc-installer via GitHub Releases (not Flathub)
     curl --retry 3 --location \
         "https://github.com/tuna-os/tuna-installer/releases/download/continuous/org.bootcinstaller.Installer.flatpak" \
-        -o /tmp/tuna-installer.flatpak && \
-    flatpak install --system --noninteractive --bundle /tmp/tuna-installer.flatpak || \
+        -o /var/cache/flatpak-dl/tuna-installer.flatpak && \
+    flatpak install --system --noninteractive --bundle /var/cache/flatpak-dl/tuna-installer.flatpak || \
         flatpak update --system --noninteractive org.bootcinstaller.Installer && \
-    rm /tmp/tuna-installer.flatpak && \
+    rm /var/cache/flatpak-dl/tuna-installer.flatpak && \
     flatpak override --system --filesystem=/etc:ro org.bootcinstaller.Installer
 
 LABEL containers.bootc 1

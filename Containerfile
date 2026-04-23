@@ -151,7 +151,15 @@ RUN --mount=type=cache,target=/var/cache/flatpak-dl,id=ubuntu2604-flatpak \
         -o /var/cache/flatpak-dl/tuna-installer.flatpak && \
     flatpak install --system --noninteractive --no-deps --bundle /var/cache/flatpak-dl/tuna-installer.flatpak && \
     rm /var/cache/flatpak-dl/tuna-installer.flatpak && \
-    flatpak override --system --filesystem=/etc:ro org.bootcinstaller.Installer
+    flatpak override --system --filesystem=/etc:ro org.bootcinstaller.Installer && \
+    # Clean up flatpak cache directory to avoid large ISO
+    rm -rf /var/cache/flatpak-dl/*
+
+# Clean up excessive flatpak metadata and locale files to keep image lean.
+# The installer app is present; runtimes/locales will be downloaded on first launch.
+RUN flatpak list --app --app-runtime 2>/dev/null | grep -q org.bootcinstaller.Installer && \
+    find /var/lib/flatpak -type d -name "locale" -o -name "translations" -o -name "docs" 2>/dev/null | xargs rm -rf 2>/dev/null || true && \
+    du -sh /var/lib/flatpak
 
 LABEL containers.bootc 1
 

@@ -126,41 +126,6 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     echo "HOME=/var/home" | tee -a "/etc/default/useradd" && \
     /ctx/shared/bootc-rootfs.sh
 
-# ── Flatpak pre-install layer ──────────────────────────────────────────────────
-# Pre-install the tuna-installer flatpak (without runtimes) into the base image.
-# Runtimes will be downloaded on first launch when needed.
-# This keeps the image smaller while ensuring the installer is available.
-#
-# bootc-rootfs.sh wipes /var, so we must install flatpaks AFTER it runs
-# so the /var/lib/flatpak repo survives into the squashfs layer.
-#
-# TMPDIR=CACHE workaround: overlayfs inside Podman builds doesn't support O_TMPFILE.
-# Use the cache mount point which is on btrfs and supports O_TMPFILE.
-RUN --mount=type=cache,target=/var/cache/flatpak-dl,id=ubuntu2604-flatpak \
-    mkdir -p /var/cache/flatpak-dl/tmp /run/dbus && \
-    export TMPDIR=/var/cache/flatpak-dl/tmp && \
-    dbus-daemon --system --fork --nopidfile && \
-    sleep 1 && \
-    flatpak remote-add --system --if-not-exists flathub \
-        https://dl.flathub.org/repo/flathub.flatpakrepo && \
-    # Download and install stable or dev tuna-installer without dependencies
-    RELEASE_TAG="continuous" && \
-    FLATPAK_FILENAME="org.bootcinstaller.Installer.flatpak" && \
-    curl --retry 3 --location \
-        "https://github.com/tuna-os/tuna-installer/releases/download/${RELEASE_TAG}/${FLATPAK_FILENAME}" \
-        -o /var/cache/flatpak-dl/tuna-installer.flatpak && \
-    flatpak install --system --noninteractive --no-deps --bundle /var/cache/flatpak-dl/tuna-installer.flatpak && \
-    rm /var/cache/flatpak-dl/tuna-installer.flatpak && \
-    flatpak override --system --filesystem=/etc:ro org.bootcinstaller.Installer && \
-    # Clean up flatpak cache directory to avoid large ISO
-    rm -rf /var/cache/flatpak-dl/*
-
-# Clean up excessive flatpak metadata and locale files to keep image lean.
-# The installer app is present; runtimes/locales will be downloaded on first launch.
-RUN flatpak list --app --app-runtime 2>/dev/null | grep -q org.bootcinstaller.Installer && \
-    find /var/lib/flatpak -type d -name "locale" -o -name "translations" -o -name "docs" 2>/dev/null | xargs rm -rf 2>/dev/null || true && \
-    du -sh /var/lib/flatpak
-
 LABEL containers.bootc 1
 
 # Test/debug: set a known root password so serial console login works during install testing.

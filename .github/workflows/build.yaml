@@ -41,6 +41,41 @@ jobs:
       - name: Build image
         run: sudo $(which just) build
 
+      # ── Structure tests — run on every PR and push ─────────────────────────
+      # Verifies filesystem layout, initramfs, ZFS units, masked sockets, etc.
+      # Fast (~5s). Reproducible locally with: just test-structure
+      - name: Run image structure tests
+        run: sudo $(which just) test-structure
+
+      # ── Boot smoke test — amd64 non-PR builds only ─────────────────────────
+      # Creates a real disk image via bootc install and boots it in QEMU KVM,
+      # verifying the system reaches a login prompt within 4 minutes.
+      # Skipped on PRs to keep review feedback fast; runs on merge to main
+      # and on the weekly schedule so regressions are caught quickly.
+      # Reproducible locally with: just generate-bootable-image && just test-boot
+
+      - name: Enable KVM
+        if: matrix.platform == 'amd64' && github.event_name != 'pull_request'
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Install QEMU + OVMF
+        if: matrix.platform == 'amd64' && github.event_name != 'pull_request'
+        run: sudo apt-get install -y --no-install-recommends qemu-system-x86 ovmf
+
+      - name: Generate bootable disk image
+        if: matrix.platform == 'amd64' && github.event_name != 'pull_request'
+        run: sudo BUILD_BASE_DIR=/var/tmp $(which just) generate-bootable-image
+
+      - name: Boot smoke test
+        if: matrix.platform == 'amd64' && github.event_name != 'pull_request'
+        run: sudo BUILD_BASE_DIR=/var/tmp $(which just) test-boot
+
+      # ── Publish ────────────────────────────────────────────────────────────
+
       - name: Rechunk image
         run: sudo $(which just) rechunk
 

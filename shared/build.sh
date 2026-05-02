@@ -2,8 +2,7 @@
 
 set -xeuo pipefail
 
-git clone "https://github.com/hanthor/bootc.git" .
-# Use ZFS dataset block-device fix from hanthor/bootc
-git checkout 71fcbe5de06eabb7ebf90643442ec704976de06f
+# Use upstream bootc — ZFS support (composefs-backend path) merged as of v1.1.x
+git clone --depth 1 --branch v1.15.2 "https://github.com/bootc-dev/bootc.git" .
 
 make bin install-all DESTDIR=/output

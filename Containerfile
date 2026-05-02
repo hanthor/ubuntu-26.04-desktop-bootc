@@ -113,6 +113,15 @@ RUN --mount=type=tmpfs,dst=/tmp --mount=type=tmpfs,dst=/root \
         zfs-import-scan.service \
         zfs-mount.service \
         zfs-zed.service && \
+    # Mask sssd socket-activation units: sssd-common is pulled in by the desktop
+    # metapackage but sssd itself is not installed, so these sockets fail at boot.
+    systemctl mask --root / \
+        sssd-autofs.socket \
+        sssd-nss.socket \
+        sssd-pac.socket \
+        sssd-pam.socket \
+        sssd-ssh.socket \
+        sssd-sudo.socket && \
     apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
 # Build the bootc-compatible initramfs with dracut
@@ -128,8 +137,8 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
 
 LABEL containers.bootc 1
 
-# Test/debug: set a known root password so serial console login works during install testing.
-# TODO: remove or replace with proper user provisioning before production release.
-RUN echo 'root:root' | chpasswd
+# Clear /run and /tmp content left behind by package post-install scripts.
+# These are runtime-only directories and must be empty in the image.
+RUN rm -rf /run/* /tmp/*
 
 RUN bootc container lint

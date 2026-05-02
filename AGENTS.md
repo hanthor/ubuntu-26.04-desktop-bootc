@@ -15,7 +15,7 @@ The installed system is maintained via OTA updates through `bootc upgrade`.
 Containerfile        Multi-stage OCI build (ctx → base → builder → system)
 Justfile             Local helpers: build, disk-image, rechunk
 shared/
-  build.sh           Compiles bootc from Rust source (cargo install)
+  build.sh           Compiles bootc from upstream source (bootc-dev/bootc, pinned tag)
   initramfs.sh       Builds dracut initramfs (bootc + ZFS modules, hostonly=no)
   bootc-rootfs.sh    Sets up bootc filesystem layout; WIPES /var — see below
 recipe.json          fisherman recipe for tuna-installer (ZFS or btrfs)
@@ -151,6 +151,10 @@ layer to keep image size down.
 | `tuna-os/ubuntu-26.04-iso` | Builds live ISO from this image; handles live session setup |
 | `tuna-os/fisherman` (`feature/zfs-root`) | Installer backend; consumes this image; handles ZFS partitioning |
 | `bootcrew/mono` | Reference for bootc-on-Ubuntu approach; `ubuntu-bootc` is upstream inspiration |
+
+**bootc version:** Built from `bootc-dev/bootc` upstream at the pinned release tag in `shared/build.sh`.
+The `hanthor/bootc` fork (previously used for ZFS block-device fixes) is no longer needed — those
+fixes landed in upstream bootc as of the v1.1.x series.
 
 ## Common pitfalls
 

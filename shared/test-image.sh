@@ -79,11 +79,9 @@ check "zfs-import-scan.service enabled"       systemctl is-enabled --root / zfs-
 check "zfs-mount.service enabled"             systemctl is-enabled --root / zfs-mount.service
 check "zfs-zed.service enabled"               systemctl is-enabled --root / zfs-zed.service
 
-# ── sssd sockets masked ──────────────────────────────────────────────────────
-section "sssd sockets masked"
-for sock in sssd-autofs sssd-nss sssd-pac sssd-pam sssd-ssh sssd-sudo; do
-    check "${sock}.socket is masked"          systemctl is-masked --root / "${sock}.socket"
-done
+# ── sssd ────────────────────────────────────────────────────────────────────
+section "sssd"
+check "sssd package installed"                dpkg -s sssd
 
 # ── security ─────────────────────────────────────────────────────────────────
 section "security"

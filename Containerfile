@@ -102,26 +102,18 @@ RUN --mount=type=tmpfs,dst=/tmp --mount=type=tmpfs,dst=/root \
     apt-get install -y \
         gnome-initial-setup \
         linux-modules-zfs-generic \
+        openssh-server \
+        sssd \
         sudo-rs \
         zfs-dracut \
         zfs-zed \
-        zfsutils-linux \
-        openssh-server && \
+        zfsutils-linux && \
     # ubuntu-desktop-minimal installs both gnome-terminal and ptyxis; keep only ptyxis.
     apt-get remove -y gnome-terminal && \
     systemctl enable --root / \
         zfs-import-scan.service \
         zfs-mount.service \
         zfs-zed.service && \
-    # Mask sssd socket-activation units: sssd-common is pulled in by the desktop
-    # metapackage but sssd itself is not installed, so these sockets fail at boot.
-    systemctl mask --root / \
-        sssd-autofs.socket \
-        sssd-nss.socket \
-        sssd-pac.socket \
-        sssd-pam.socket \
-        sssd-ssh.socket \
-        sssd-sudo.socket && \
     apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
 # Build the bootc-compatible initramfs with dracut

@@ -131,6 +131,8 @@ LABEL containers.bootc 1
 
 # Clear /run and /tmp content left behind by package post-install scripts.
 # These are runtime-only directories and must be empty in the image.
-RUN rm -rf /run/* /tmp/*
+# /run/secrets is a bind-mount injected by Podman during build — skip it.
+RUN find /run -mindepth 1 -maxdepth 1 ! -name 'secrets' -exec rm -rf {} + ; \
+    rm -rf /tmp/*
 
 RUN bootc container lint

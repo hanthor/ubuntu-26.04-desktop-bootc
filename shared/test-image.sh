@@ -69,6 +69,11 @@ check "var/usrlocal entry"                    grep -q "var/usrlocal" /usr/lib/tm
 section "useradd defaults"
 check "HOME=/var/home in /etc/default/useradd" grep -q "HOME=/var/home" /etc/default/useradd
 
+# ── container tools ───────────────────────────────────────────────────────────
+section "container tools"
+check "podman installed"   dpkg -s podman
+check "skopeo installed"   dpkg -s skopeo
+
 # ── Flatpak ──────────────────────────────────────────────────────────────────
 section "Flatpak"
 check "Flathub .flatpakrepo present"          test -f /etc/flatpak/remotes.d/flathub.flatpakrepo

@@ -37,6 +37,7 @@ RUN --mount=type=tmpfs,dst=/tmp --mount=type=tmpfs,dst=/root --mount=type=tmpfs,
         flatpak \
         libostree-dev \
         linux-firmware \
+        podman \
         plymouth \
         plymouth-themes \
         rsync \

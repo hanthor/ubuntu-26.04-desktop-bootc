@@ -126,7 +126,9 @@ generate-bootable-image:
         --karg splash \
         --karg console=tty0 \
         --karg "console=ttyS0,115200" \
-        --karg systemd.debug_shell=ttyS1
+        --karg systemd.debug_shell=ttyS1 \
+        --karg systemd.log_level=debug \
+        --karg systemd.log_target=console
     echo "==> Done: {{base_dir}}/bootable.raw"
     sync
 
@@ -302,8 +304,8 @@ test-boot:
 
     echo ""
     echo "=== FAILED: timeout after ${TIMEOUT}s ==="
-    echo "--- first 200 lines (initramfs/bootc stage) ---"
-    strings "$SERIAL_LOG" 2>/dev/null | head -200 || true
+    echo "--- initramfs boot log (strings, first 400 lines) ---"
+    strings "$SERIAL_LOG" 2>/dev/null | head -400 || true
     kill "$QEMU_PID" 2>/dev/null || true
     exit 1
 

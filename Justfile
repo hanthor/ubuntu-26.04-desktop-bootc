@@ -157,32 +157,7 @@ generate-bootable-image:
         losetup -d "$LOOP2" 2>/dev/null
     fi
 
-    # Verify the disk was created correctly
-    echo "==> Verifying disk layout ..."
-    LOOP=$(losetup -f --show --partscan "{{base_dir}}/bootable.raw" 2>/dev/null)
-    if [[ -n "$LOOP" ]]; then
-        partx -s "$LOOP" 2>/dev/null || sfdisk -l "$LOOP" 2>/dev/null | grep -E "Device|EFI|Linux"
-        echo "--- blkid ---"
-        blkid "${LOOP}p1" "${LOOP}p2" "${LOOP}p3" 2>/dev/null || true
-        # Check EFI/BLS entries
-        TMPDIR=$(mktemp -d)
-        mount "${LOOP}p2" "$TMPDIR" 2>/dev/null && {
-            echo "--- BLS entries ---"
-            cat "$TMPDIR"/loader/entries/*.conf 2>/dev/null | head -10 || true
-            umount "$TMPDIR" 2>/dev/null
-        }
-        # Mount root and verify composefs structure
-        ROOTDIR=$(mktemp -d)
-        mount "${LOOP}p3" "$ROOTDIR" 2>/dev/null && {
-            echo "--- root partition contents ---"
-            ls "$ROOTDIR"
-            umount "$ROOTDIR" 2>/dev/null
-        } || echo "WARN: could not mount root partition ${LOOP}p3"
-        rmdir "$TMPDIR" "$ROOTDIR" 2>/dev/null || true
-        losetup -d "$LOOP" 2>/dev/null
-    else
-        echo "WARN: could not create loop device for verification"
-    fi
+
 
 # Boot the disk image interactively in QEMU (GTK display + serial debug, SSH on :2222)
 [group('test')]
@@ -316,12 +291,8 @@ test-boot:
 
     echo ""
     echo "=== FAILED: timeout after ${TIMEOUT}s ==="
-    echo "--- mount/filesystem errors in serial log ---"
-    strings "$SERIAL_LOG" 2>/dev/null | \
-      grep -i -E "mount|failed|error|XFS|ext4|composefs|sysroot|verity|EROFS" | \
-      head -60 || true
-    echo "--- last 50 lines of serial ---"
-    tail -50 "$SERIAL_LOG" 2>/dev/null | strings || true
+    echo "--- last 60 lines of serial ---"
+    tail -60 "$SERIAL_LOG" 2>/dev/null | strings || echo "(empty)"
     kill "$QEMU_PID" 2>/dev/null || true
     exit 1
 

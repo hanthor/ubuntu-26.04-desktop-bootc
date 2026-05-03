@@ -202,14 +202,26 @@ test-boot:
 
     OVMF_CODE=""
     for f in \
-            /usr/share/edk2/ovmf/OVMF_CODE.fd \
-            /usr/share/OVMF/OVMF_CODE.fd \
             /usr/share/OVMF/OVMF_CODE_4M.fd \
+            /usr/share/OVMF/OVMF_CODE.fd \
+            /usr/share/edk2/ovmf/OVMF_CODE.fd \
             /usr/share/edk2/x64/OVMF_CODE.4m.fd \
             /usr/share/qemu/OVMF_CODE.fd; do
         [[ -f "$f" ]] && OVMF_CODE="$f" && break
     done
     [[ -n "$OVMF_CODE" ]] || { echo "ERROR: OVMF not found." >&2; exit 1; }
+
+    # OVMF_VARS must be writable — without it UEFI cannot store boot entries
+    # and may fail to locate the EFI partition for the fallback path.
+    OVMF_VARS=$(mktemp /tmp/ubuntu-bootc-XXXX-vars.fd)
+    for f in \
+            /usr/share/OVMF/OVMF_VARS_4M.fd \
+            /usr/share/OVMF/OVMF_VARS.fd \
+            /usr/share/edk2/ovmf/OVMF_VARS.fd \
+            /usr/share/edk2/x64/OVMF_VARS.4m.fd \
+            /usr/share/qemu/OVMF_VARS.fd; do
+        [[ -f "$f" ]] && cp "$f" "$OVMF_VARS" && break
+    done
 
     SERIAL_LOG=$(mktemp /tmp/ubuntu-bootc-XXXX.log)
     TIMEOUT=240
@@ -221,6 +233,7 @@ test-boot:
     echo ""
 
     qemu-system-x86_64 \
+        -machine q35 \
         -enable-kvm \
         -m 2048 \
         -cpu host \
@@ -228,6 +241,7 @@ test-boot:
         -display none \
         -drive "file=${DISK},format=raw,if=virtio" \
         -drive "if=pflash,format=raw,readonly=on,file=${OVMF_CODE}" \
+        -drive "if=pflash,format=raw,snapshot=on,file=${OVMF_VARS}" \
         -device "virtio-net-pci,netdev=net0" \
         -netdev "user,id=net0" \
         -serial "file:${SERIAL_LOG}" \

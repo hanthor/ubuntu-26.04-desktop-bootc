@@ -130,6 +130,33 @@ generate-bootable-image:
     echo "==> Done: {{base_dir}}/bootable.raw"
     sync
 
+    # Patch BLS entry with explicit root=UUID=... so systemd-gpt-auto-generator
+    # doesn't need to guess (works around systemd 259+ GPT-auto quirks in CI).
+    echo "==> Patching BLS entry with explicit root= ..."
+    LOOP2=$(losetup -f --show --partscan "{{base_dir}}/bootable.raw" 2>/dev/null)
+    if [[ -n "$LOOP2" ]]; then
+        ROOT_UUID=$(blkid -s UUID -o value "${LOOP2}p3" 2>/dev/null || true)
+        ROOT_TYPE=$(blkid -s TYPE  -o value "${LOOP2}p3" 2>/dev/null || true)
+        if [[ -n "$ROOT_UUID" && -n "$ROOT_TYPE" ]]; then
+            EFIMNT=$(mktemp -d)
+            mount "${LOOP2}p2" "$EFIMNT" 2>/dev/null && {
+                for conf in "$EFIMNT"/loader/entries/*.conf; do
+                    [[ -f "$conf" ]] || continue
+                    # Only patch if root= not already present
+                    if ! grep -q "^options.*root=" "$conf"; then
+                        sed -i "s|^options |options root=UUID=${ROOT_UUID} rootfstype=${ROOT_TYPE} |" "$conf"
+                        echo "    Patched: root=UUID=${ROOT_UUID} rootfstype=${ROOT_TYPE}"
+                        cat "$conf" | grep "^options"
+                    fi
+                done
+                sync
+                umount "$EFIMNT" 2>/dev/null
+            }
+            rmdir "$EFIMNT" 2>/dev/null || true
+        fi
+        losetup -d "$LOOP2" 2>/dev/null
+    fi
+
     # Verify the disk was created correctly
     echo "==> Verifying disk layout ..."
     LOOP=$(losetup -f --show --partscan "{{base_dir}}/bootable.raw" 2>/dev/null)
@@ -242,17 +269,7 @@ test-boot:
     done
     [[ -n "$OVMF_CODE" ]] || { echo "ERROR: OVMF not found." >&2; exit 1; }
 
-    # OVMF_VARS must be writable — without it UEFI cannot store boot entries
-    # and may fail to locate the EFI partition for the fallback path.
-    OVMF_VARS=$(mktemp /tmp/ubuntu-bootc-XXXX-vars.fd)
-    for f in \
-            /usr/share/OVMF/OVMF_VARS_4M.fd \
-            /usr/share/OVMF/OVMF_VARS.fd \
-            /usr/share/edk2/ovmf/OVMF_VARS.fd \
-            /usr/share/edk2/x64/OVMF_VARS.4m.fd \
-            /usr/share/qemu/OVMF_VARS.fd; do
-        [[ -f "$f" ]] && cp "$f" "$OVMF_VARS" && break
-    done
+
 
     SERIAL_LOG=$(mktemp /tmp/ubuntu-bootc-XXXX.log)
     TIMEOUT=240
@@ -264,7 +281,6 @@ test-boot:
     echo ""
 
     $QEMU \
-        -machine q35 \
         -enable-kvm \
         -m 2048 \
         -cpu host \
@@ -272,9 +288,7 @@ test-boot:
         -display none \
         -drive "file=${DISK},format=raw,if=virtio" \
         -drive "if=pflash,format=raw,readonly=on,file=${OVMF_CODE}" \
-        -drive "if=pflash,format=raw,snapshot=on,file=${OVMF_VARS}" \
-        -device "virtio-net-pci,netdev=net0" \
-        -netdev "user,id=net0" \
+        -nic none \
         -serial "file:${SERIAL_LOG}" \
         -no-reboot &
     QEMU_PID=$!

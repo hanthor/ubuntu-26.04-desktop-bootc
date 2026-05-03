@@ -71,8 +71,9 @@ check "HOME=/var/home in /etc/default/useradd" grep -q "HOME=/var/home" /etc/def
 
 # ── container tools ───────────────────────────────────────────────────────────
 section "container tools"
-check "podman installed"   dpkg -s podman
-check "skopeo installed"   dpkg -s skopeo
+# dpkg database is wiped by bootc-rootfs.sh — check binaries directly
+check "podman installed"   test -x /usr/bin/podman
+check "skopeo installed"   test -x /usr/bin/skopeo
 
 # ── Flatpak ──────────────────────────────────────────────────────────────────
 section "Flatpak"
@@ -86,12 +87,16 @@ check "zfs-zed.service enabled"               systemctl is-enabled --root / zfs-
 
 # ── sssd ────────────────────────────────────────────────────────────────────
 section "sssd"
-check "sssd package installed"                dpkg -s sssd
+# dpkg database is wiped by bootc-rootfs.sh — check the sssd binary
+check "sssd installed"   test -x /usr/sbin/sssd
 
 # ── security ─────────────────────────────────────────────────────────────────
 section "security"
 check "root password locked (!/*)"            grep -q "^root:[!*]" /etc/shadow
-check "/run is empty (no post-install debris)" test -z "$(ls -A /run 2>/dev/null)"
+# Podman injects .containerenv and secrets/ into /run during `podman run`.
+# Those are Podman's own mounts, not post-install debris — exclude them.
+check "/run is empty (no post-install debris)" \
+  test -z "$(ls -A /run 2>/dev/null | grep -Ev '^(secrets|\.containerenv)$')"
 check "/tmp is empty (no post-install debris)" test -z "$(ls -A /tmp 2>/dev/null)"
 
 # ── result ───────────────────────────────────────────────────────────────────

@@ -170,7 +170,9 @@ boot-vm:
     echo "    SSH forward: ssh -p 2222 root@127.0.0.1"
     echo "    Debug shell on ttyS1 — Ctrl-A C for QEMU monitor"
     echo ""
-    qemu-system-x86_64 \
+    QEMU=$(command -v qemu-system-x86_64 /usr/libexec/qemu-kvm /usr/bin/qemu-kvm 2>/dev/null | head -1)
+    [[ -n "$QEMU" ]] || { echo "ERROR: qemu not found"; exit 1; }
+    "$QEMU" \
         -enable-kvm \
         -m "{{vm_ram}}" \
         -cpu host \
@@ -201,6 +203,8 @@ test-boot:
     fi
 
     OVMF_CODE=""
+    QEMU=$(command -v qemu-system-x86_64 /usr/libexec/qemu-kvm /usr/bin/qemu-kvm 2>/dev/null | head -1)
+    [[ -n "$QEMU" ]] || { echo "ERROR: qemu not found." >&2; exit 1; }
     for f in \
             /usr/share/OVMF/OVMF_CODE_4M.fd \
             /usr/share/OVMF/OVMF_CODE.fd \
@@ -232,7 +236,7 @@ test-boot:
     echo "    Timeout: ${TIMEOUT}s"
     echo ""
 
-    qemu-system-x86_64 \
+    $QEMU \
         -machine q35 \
         -enable-kvm \
         -m 2048 \
@@ -271,8 +275,10 @@ test-boot:
 
     echo ""
     echo "=== FAILED: timeout after ${TIMEOUT}s ==="
-    echo "--- last 50 lines of serial log ---"
-    tail -50 "$SERIAL_LOG" 2>/dev/null || echo "(empty)"
+    echo "--- first 80 lines (initramfs/bootc stage) ---"
+    strings "$SERIAL_LOG" 2>/dev/null | head -80 || true
+    echo "--- last 30 lines ---"
+    tail -30 "$SERIAL_LOG" 2>/dev/null | strings || echo "(empty)"
     kill "$QEMU_PID" 2>/dev/null || true
     exit 1
 

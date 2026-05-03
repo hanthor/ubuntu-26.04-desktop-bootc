@@ -37,8 +37,11 @@ rechunk:
     #!/usr/bin/env bash
     set -euo pipefail
     CONFIG=$({{sudo_cmd}} {{container_runtime}} inspect "{{image_name}}:{{image_tag}}")
+    # Use podman image mount rather than --mount=type=image (better compatibility
+    # across podman versions — type=image dest= is not supported on all runners).
+    IMGMOUNT=$({{sudo_cmd}} {{container_runtime}} image mount "{{image_name}}:{{image_tag}}")
     {{sudo_cmd}} {{container_runtime}} run --rm \
-        "--mount=type=image,src={{image_name}}:{{image_tag}},dest=/chunkah" \
+        -v "${IMGMOUNT}:/chunkah:ro" \
         -e CHUNKAH_CONFIG_STR="$CONFIG" \
         quay.io/coreos/chunkah build \
             --label ostree.bootable=1 \
@@ -103,7 +106,8 @@ generate-bootable-image:
         fallocate -l 20G "{{base_dir}}/bootable.raw"
     fi
     echo "==> Installing {{image_name}}:{{image_tag}} to disk image ..."
-    just bootc install to-disk \
+    # Use $(command -v just) so inner just calls work under sudo too.
+    $(command -v just) bootc install to-disk \
         --via-loopback /data/bootable.raw \
         --filesystem "{{filesystem}}" \
         --wipe \

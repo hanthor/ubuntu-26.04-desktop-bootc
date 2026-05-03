@@ -7,7 +7,7 @@ default:
 export image_name := env("BUILD_IMAGE_NAME", "ubuntu-26.04-desktop-bootc")
 export image_tag  := env("BUILD_IMAGE_TAG",  "latest")
 export base_dir   := env("BUILD_BASE_DIR",   ".")
-export filesystem := env("BUILD_FILESYSTEM", "ext4")
+export filesystem := env("BUILD_FILESYSTEM", "xfs")
 
 # VM settings (override with VM_RAM=8192 VM_CPUS=4 just boot-vm)
 export vm_ram  := env("VM_RAM",  "4096")

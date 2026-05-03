@@ -68,7 +68,7 @@ jobs:
 
       - name: Generate bootable disk image
         if: matrix.platform == 'amd64' && github.event_name != 'pull_request'
-        run: sudo BUILD_BASE_DIR=/var/tmp $(which just) generate-bootable-image
+        run: sudo JUST_BIN=$(which just) BUILD_BASE_DIR=/var/tmp $(which just) generate-bootable-image
 
       - name: Boot smoke test
         if: matrix.platform == 'amd64' && github.event_name != 'pull_request'
@@ -109,13 +109,12 @@ jobs:
 
       - name: Sign image
         if: github.event_name != 'pull_request'
+        continue-on-error: true   # non-fatal: fails gracefully if SIGNING_SECRET not set
         env:
           DIGEST: ${{ steps.push.outputs.digest }}
           COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
         run: |
           cosign sign -y \
-            --new-bundle-format=false \
-            --use-signing-config=false \
             --key env://COSIGN_PRIVATE_KEY \
             "${IMAGE_REGISTRY}/${IMAGE_NAME}@${DIGEST}"
 

@@ -106,8 +106,16 @@ generate-bootable-image:
         fallocate -l 20G "{{base_dir}}/bootable.raw"
     fi
     echo "==> Installing {{image_name}}:{{image_tag}} to disk image ..."
-    # Use $(command -v just) so inner just calls work under sudo too.
-    $(command -v just) bootc install to-disk \
+    # Resolve just binary: sudo strips PATH so $(command -v just) returns empty.
+    # Try JUST_BIN env (set by CI), then common install locations, then PATH.
+    _JUST="${JUST_BIN:-}"
+    if [[ -z "$_JUST" ]]; then
+        for _p in "$(command -v just 2>/dev/null)"                   /usr/local/bin/just /usr/bin/just                   "${HOME}/.cargo/bin/just" "${HOME}/.local/bin/just"; do
+            [[ -x "$_p" ]] && { _JUST="$_p"; break; }
+        done
+    fi
+    [[ -n "$_JUST" ]] || { echo "ERROR: just binary not found"; exit 1; }
+    "$_JUST" bootc install to-disk \
         --via-loopback /data/bootable.raw \
         --filesystem "{{filesystem}}" \
         --wipe \

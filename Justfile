@@ -275,10 +275,8 @@ test-boot:
 
     echo ""
     echo "=== FAILED: timeout after ${TIMEOUT}s ==="
-    echo "--- first 80 lines (initramfs/bootc stage) ---"
-    strings "$SERIAL_LOG" 2>/dev/null | head -80 || true
-    echo "--- last 30 lines ---"
-    tail -30 "$SERIAL_LOG" 2>/dev/null | strings || echo "(empty)"
+    echo "--- first 200 lines (initramfs/bootc stage) ---"
+    strings "$SERIAL_LOG" 2>/dev/null | head -200 || true
     kill "$QEMU_PID" 2>/dev/null || true
     exit 1
 

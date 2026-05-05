@@ -1,17 +1,28 @@
 FROM scratch AS ctx
-
 COPY shared/ /shared
+
+# Provides a pristine dpkg/apt database to restore in the system stage.
+# bootc-rootfs.sh in the base image wiped /var (including /var/lib/dpkg),
+# so derived images cannot run apt without restoring the dpkg state first.
+FROM docker.io/library/ubuntu:26.04 AS dpkg-state
 
 # Ubuntu 26.04 LTS "Resolute Raccoon" — GNOME 50 desktop.
 # Derives from the minimal bootc base image which provides the kernel,
 # systemd-boot, dracut, bootc binary, openssh, podman, and core userspace.
 FROM ghcr.io/hanthor/ubuntu-26.04-bootc:latest AS system
-ENV HOME=/tmp
 
 ENV DEBIAN_FRONTEND=noninteractive
+ENV HOME=/tmp
 
-# Recreate apt working directories wiped by bootc-rootfs.sh in the base image.
-RUN mkdir -p /var/lib/apt/lists/partial /var/lib/dpkg/updates /var/lib/dpkg/info /var/cache/apt/archives/partial
+# Restore the dpkg/apt database from the pristine ubuntu:26.04 stage.
+# The base image ran bootc-rootfs.sh which wiped /var; apt-get will not
+# work without a valid dpkg status and the supporting directory tree.
+RUN --mount=type=bind,from=dpkg-state,source=/var,target=/mnt/var \
+    cp -a /mnt/var/lib/dpkg /var/lib/ && \
+    mkdir -p \
+        /var/cache/apt/archives/partial \
+        /var/lib/apt/lists/partial \
+        /var/log/apt
 
 # Plymouth (splash screen) + Flatpak + Flathub remote.
 # Hook stubs and kernel are already present in the base image.
@@ -29,8 +40,7 @@ RUN --mount=type=tmpfs,dst=/tmp \
 # Minimal GNOME 50 desktop. linux-generic is already in the base; this step
 # pulls in the desktop packages only. --force-confold avoids interactive
 # conffile prompts for the kernel hook stubs already in place.
-RUN \
-    apt-get -o Dpkg::Options::="--force-confold" update -y && \
+RUN apt-get -o Dpkg::Options::="--force-confold" update -y && \
     apt-get -o Dpkg::Options::="--force-confold" \
         install -y --install-recommends ubuntu-desktop-minimal && \
     apt-get clean -y && rm -rf /var/lib/apt/lists/*

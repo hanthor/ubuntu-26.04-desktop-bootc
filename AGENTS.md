@@ -19,7 +19,7 @@ shared/
   initramfs.sh       Builds dracut initramfs (bootc + ZFS modules, hostonly=no)
   bootc-rootfs.sh    Sets up bootc filesystem layout; WIPES /var — see below
 recipe.json          fisherman recipe for tuna-installer (ZFS or btrfs)
-.github/workflows/   CI: build + push to ghcr.io/hanthor/ubuntu-26.04-desktop-bootc
+.github/workflows/   CI: build + push to ghcr.io/ubuntu-bootc/ubuntu-26.04-desktop-bootc
 ```
 
 ## Build stages

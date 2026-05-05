@@ -9,7 +9,7 @@ FROM docker.io/library/ubuntu:26.04 AS dpkg-state
 # Ubuntu 26.04 LTS "Resolute Raccoon" — GNOME 50 desktop.
 # Derives from the minimal bootc base image which provides the kernel,
 # systemd-boot, dracut, bootc binary, openssh, podman, and core userspace.
-FROM ghcr.io/hanthor/ubuntu-26.04-bootc:latest AS system
+FROM ghcr.io/ubuntu-bootc/ubuntu-26.04-bootc:latest AS system
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV HOME=/tmp

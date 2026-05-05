@@ -8,23 +8,23 @@ companion live ISO ([tuna-os/ubuntu-26.04-iso](https://github.com/tuna-os/ubuntu
 via fisherman, with ZFS or btrfs as the target filesystem.
 
 ```
-ghcr.io/hanthor/ubuntu-26.04-desktop-bootc:latest
+ghcr.io/ubuntu-bootc/ubuntu-26.04-desktop-bootc:latest
 ```
 
 ## Image hierarchy
 
 ```
 docker.io/library/ubuntu:26.04
-└── ghcr.io/hanthor/ubuntu-26.04-bootc
-    ├── ghcr.io/hanthor/ubuntu-26.04-server-bootc
-    └── ghcr.io/hanthor/ubuntu-26.04-desktop-bootc   ← you are here
+└── ghcr.io/ubuntu-bootc/ubuntu-26.04-bootc
+    ├── ghcr.io/ubuntu-bootc/ubuntu-26.04-server-bootc
+    └── ghcr.io/ubuntu-bootc/ubuntu-26.04-desktop-bootc   ← you are here
 ```
 
 | Image | Description |
 |-------|-------------|
-| [ubuntu-26.04-bootc](https://github.com/hanthor/ubuntu-26.04-bootc) | Minimal base — kernel, bootc, dracut, ssh, podman |
-| [ubuntu-26.04-server-bootc](https://github.com/hanthor/ubuntu-26.04-server-bootc) | Server layer — cloud-init, netplan, ufw, snapd, chrony |
-| **[ubuntu-26.04-desktop-bootc](https://github.com/hanthor/ubuntu-26.04-desktop-bootc)** | This image — GNOME 50 desktop layer |
+| [ubuntu-26.04-bootc](https://github.com/ubuntu-bootc/ubuntu-26.04-bootc) | Minimal base — kernel, bootc, dracut, ssh, podman |
+| [ubuntu-26.04-server-bootc](https://github.com/ubuntu-bootc/ubuntu-26.04-server-bootc) | Server layer — cloud-init, netplan, ufw, snapd, chrony |
+| **[ubuntu-26.04-desktop-bootc](https://github.com/ubuntu-bootc/ubuntu-26.04-desktop-bootc)** | This image — GNOME 50 desktop layer |
 
 ## What this adds over the base
 
@@ -37,7 +37,7 @@ docker.io/library/ubuntu:26.04
 | First-run OOBE | `gnome-initial-setup` |
 | Initramfs | Rebuilt with `bootc + plymouth + zfs` dracut modules |
 
-Everything from [ubuntu-26.04-bootc](https://github.com/hanthor/ubuntu-26.04-bootc)
+Everything from [ubuntu-26.04-bootc](https://github.com/ubuntu-bootc/ubuntu-26.04-bootc)
 is also present: kernel 7.0, systemd-boot, openssh-server, podman, skopeo, sssd, sudo.
 
 ## Building locally
@@ -66,13 +66,13 @@ sudo bootc upgrade
 |------|------|
 | [tuna-os/ubuntu-26.04-iso](https://github.com/tuna-os/ubuntu-26.04-iso) | Live ISO that installs this image |
 | [tuna-os/fisherman](https://github.com/tuna-os/fisherman) | Installer backend; handles ZFS partitioning |
-| [ubuntu-26.04-bootc](https://github.com/hanthor/ubuntu-26.04-bootc) | Minimal base this image derives from |
-| [ubuntu-26.04-server-bootc](https://github.com/hanthor/ubuntu-26.04-server-bootc) | Server sibling image |
+| [ubuntu-26.04-bootc](https://github.com/ubuntu-bootc/ubuntu-26.04-bootc) | Minimal base this image derives from |
+| [ubuntu-26.04-server-bootc](https://github.com/ubuntu-bootc/ubuntu-26.04-server-bootc) | Server sibling image |
 
 ## Known issues
 
-- [#2](https://github.com/hanthor/ubuntu-26.04-desktop-bootc/issues/2) — composefs verity regression on kernel 7.0 (`f77f281b6118`)
-- [#3](https://github.com/hanthor/ubuntu-26.04-desktop-bootc/issues/3) — `sysroot.mount` / `systemd-gpt-auto-generator` quirk on Ubuntu 26.04
+- [#2](https://github.com/ubuntu-bootc/ubuntu-26.04-desktop-bootc/issues/2) — composefs verity regression on kernel 7.0 (`f77f281b6118`)
+- [#3](https://github.com/ubuntu-bootc/ubuntu-26.04-desktop-bootc/issues/3) — `sysroot.mount` / `systemd-gpt-auto-generator` quirk on Ubuntu 26.04
 
 ## Project layout
 

@@ -1,97 +1,87 @@
 # ubuntu-26.04-desktop-bootc
 
-A [bootc](https://github.com/bootc-dev/bootc)-compatible container image for **Ubuntu 26.04 LTS "Resolute Raccoon"** — GNOME 50 desktop, kernel 7.0, ZFS support, and Plymouth boot splash.
+Ubuntu 26.04 LTS "Resolute Raccoon" **desktop** bootc image — GNOME 50,
+kernel 7.0, ZFS support, Plymouth, and Flatpak/Flathub.
 
-The image is designed to be installed from the companion live ISO ([tuna-os/ubuntu-26.04-iso](https://github.com/tuna-os/ubuntu-26.04-iso)) via the tuna-installer, with **ZFS root** or btrfs as the target filesystem.
+Derives from the minimal bootc base. Designed to be installed from the
+companion live ISO ([tuna-os/ubuntu-26.04-iso](https://github.com/tuna-os/ubuntu-26.04-iso))
+via fisherman, with ZFS or btrfs as the target filesystem.
 
-## What's inside
+```
+ghcr.io/hanthor/ubuntu-26.04-desktop-bootc:latest
+```
 
-| Component | Details |
+## Image hierarchy
+
+```
+docker.io/library/ubuntu:26.04
+└── ghcr.io/hanthor/ubuntu-26.04-bootc
+    ├── ghcr.io/hanthor/ubuntu-26.04-server-bootc
+    └── ghcr.io/hanthor/ubuntu-26.04-desktop-bootc   ← you are here
+```
+
+| Image | Description |
+|-------|-------------|
+| [ubuntu-26.04-bootc](https://github.com/hanthor/ubuntu-26.04-bootc) | Minimal base — kernel, bootc, dracut, ssh, podman |
+| [ubuntu-26.04-server-bootc](https://github.com/hanthor/ubuntu-26.04-server-bootc) | Server layer — cloud-init, netplan, ufw, snapd, chrony |
+| **[ubuntu-26.04-desktop-bootc](https://github.com/hanthor/ubuntu-26.04-desktop-bootc)** | This image — GNOME 50 desktop layer |
+
+## What this adds over the base
+
+| Component | Package |
 |-----------|---------|
-| Base OS | Ubuntu 26.04 LTS "Resolute Raccoon" |
-| Desktop | GNOME 50 (`ubuntu-desktop-minimal`) |
-| Kernel | Linux 7.0 (`linux-generic`) |
-| Init | systemd |
-| Bootloader | systemd-boot |
-| Initramfs | dracut (bootc module, zstd-compressed, `hostonly=no`) |
-| Sysroot | composefs (read-only, overlaid at runtime) |
-| ZFS | OpenZFS 2.x (`zfsutils-linux`, `zfs-dracut`, kernel module) |
-| Plymouth | `spinner` theme (boot splash) |
-| Flatpak | Flathub remote pre-configured via `/etc/flatpak/remotes.d/` |
-| First-run | `gnome-initial-setup` (Ubuntu edition) |
-| Remote access | `openssh-server` |
-| Privilege | `sudo` |
-| bootc | Built from source (Rust/cargo) |
+| Desktop | `ubuntu-desktop-minimal` (GNOME 50) |
+| Splash | `plymouth` + `plymouth-themes` |
+| Apps | `flatpak` + Flathub remote (`/etc/flatpak/remotes.d/`) |
+| ZFS root | `zfsutils-linux`, `zfs-dracut`, `linux-modules-zfs-generic`, `zfs-zed` |
+| First-run OOBE | `gnome-initial-setup` |
+| Initramfs | Rebuilt with `bootc + plymouth + zfs` dracut modules |
 
-## Requirements
+Everything from [ubuntu-26.04-bootc](https://github.com/hanthor/ubuntu-26.04-bootc)
+is also present: kernel 7.0, systemd-boot, openssh-server, podman, skopeo, sssd, sudo.
 
-- [Podman](https://podman.io/) ≥ 4.5
-- [just](https://just.systems/)
-- Linux host, x86_64
-- At least 30 GB free disk space (build + layer cache)
-
-## Build
+## Building locally
 
 ```bash
 just build
 ```
 
-This produces `localhost/ubuntu-26.04-desktop-bootc:latest`.
-
-The build is multi-stage and takes 20–40 minutes on first run (Rust compilation). Subsequent builds are fast thanks to layer caching.
-
-## Create a bootable raw disk image
+## Create a bootable disk image (for testing)
 
 ```bash
-just disk-image          # creates bootable.img (20 GB) via bootc install to-disk
+just generate-bootable-image   # creates base_dir/bootable.raw (20 GB)
+just test-boot                 # headless QEMU smoke test
+just boot-vm                   # interactive QEMU with GTK display
 ```
 
-Flash to USB or boot in QEMU:
-
-```bash
-# Flash
-sudo dd if=bootable.img of=/dev/sdX bs=4M status=progress conv=fsync
-
-# QEMU (UEFI — Secure Boot not required)
-qemu-system-x86_64 \
-  -enable-kvm -m 4096 -smp 2 \
-  -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE.fd \
-  -drive format=raw,file=bootable.img
-```
-
-## OTA updates on a running system
+## OTA updates on an installed system
 
 ```bash
 sudo bootc upgrade
 ```
 
-## Re-chunk for efficient OCI distribution
+## Related projects
 
-```bash
-just rechunk
-```
+| Repo | Role |
+|------|------|
+| [tuna-os/ubuntu-26.04-iso](https://github.com/tuna-os/ubuntu-26.04-iso) | Live ISO that installs this image |
+| [tuna-os/fisherman](https://github.com/tuna-os/fisherman) | Installer backend; handles ZFS partitioning |
+| [ubuntu-26.04-bootc](https://github.com/hanthor/ubuntu-26.04-bootc) | Minimal base this image derives from |
+| [ubuntu-26.04-server-bootc](https://github.com/hanthor/ubuntu-26.04-server-bootc) | Server sibling image |
 
-Produces a maximally layer-deduplicated image suitable for GHCR distribution.
+## Known issues
 
-## CI / Publishing
-
-GitHub Actions builds and pushes `ghcr.io/hanthor/ubuntu-26.04-desktop-bootc:latest` on every push to `main`. Weekly rebuilds pick up upstream Ubuntu package updates.
+- [#2](https://github.com/hanthor/ubuntu-26.04-desktop-bootc/issues/2) — composefs verity regression on kernel 7.0 (`f77f281b6118`)
+- [#3](https://github.com/hanthor/ubuntu-26.04-desktop-bootc/issues/3) — `sysroot.mount` / `systemd-gpt-auto-generator` quirk on Ubuntu 26.04
 
 ## Project layout
 
 ```
-Containerfile
-│  Multi-stage build:
-│    ctx      — build context (shared scripts)
-│    base     — ubuntu:26.04 base
-│    builder  — Rust toolchain + bootc source compile
-│    system   — installs GNOME 50, kernel 7.0, ZFS, Plymouth, Flatpak
-│
+Containerfile          FROM ubuntu-26.04-bootc + GNOME + ZFS + plymouth
+Justfile               build / generate-bootable-image / test-boot / boot-vm
 shared/
-  build.sh         — compiles bootc from source (cargo install)
-  initramfs.sh     — builds dracut initramfs with bootc + ZFS modules
-  bootc-rootfs.sh  — sets up the bootc/composefs filesystem layout
-                     (wipes /var, creates ostree symlinks)
-Justfile           — build / disk-image / rechunk helpers
-recipe.json        — fisherman recipe for tuna-installer disk install
+  initramfs.sh         dracut with bootc + plymouth + zfs modules
+  bootc-rootfs.sh      ostree symlink forest (wipes /var — see AGENTS.md)
+  test-image.sh        structure tests run in CI
+recipe.json            fisherman recipe (ZFS or btrfs install)
 ```

@@ -6,12 +6,13 @@ COPY shared/ /shared
 # Derives from the minimal bootc base image which provides the kernel,
 # systemd-boot, dracut, bootc binary, openssh, podman, and core userspace.
 FROM ghcr.io/hanthor/ubuntu-26.04-bootc:latest AS system
+ENV HOME=/tmp
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Plymouth (splash screen) + Flatpak + Flathub remote.
 # Hook stubs and kernel are already present in the base image.
-RUN --mount=type=tmpfs,dst=/tmp --mount=type=tmpfs,dst=/root \
+RUN --mount=type=tmpfs,dst=/tmp \
     apt-get update -y && \
     apt-get install -y \
         flatpak \
@@ -25,7 +26,7 @@ RUN --mount=type=tmpfs,dst=/tmp --mount=type=tmpfs,dst=/root \
 # Minimal GNOME 50 desktop. linux-generic is already in the base; this step
 # pulls in the desktop packages only. --force-confold avoids interactive
 # conffile prompts for the kernel hook stubs already in place.
-RUN --mount=type=tmpfs,dst=/root \
+RUN \
     apt-get -o Dpkg::Options::="--force-confold" update -y && \
     apt-get -o Dpkg::Options::="--force-confold" \
         install -y --install-recommends ubuntu-desktop-minimal && \
@@ -34,7 +35,7 @@ RUN --mount=type=tmpfs,dst=/root \
 # ZFS root support — dracut module, kernel module, userspace tools, event daemon.
 # Must be installed before rebuilding the initramfs so the 'zfs' dracut module
 # is available. See base image AGENTS.md for ZFS service rationale.
-RUN --mount=type=tmpfs,dst=/tmp --mount=type=tmpfs,dst=/root \
+RUN --mount=type=tmpfs,dst=/tmp \
     apt-get update -y && \
     apt-get install -y \
         gnome-initial-setup \
@@ -53,7 +54,7 @@ RUN --mount=type=tmpfs,dst=/tmp --mount=type=tmpfs,dst=/root \
 # Rebuild the initramfs now that plymouth and zfs-dracut are installed.
 # The base image initramfs only has the bootc module; we extend it here
 # with plymouth (splash) and zfs (ZFS root support).
-RUN --mount=type=tmpfs,dst=/tmp --mount=type=tmpfs,dst=/root \
+RUN --mount=type=tmpfs,dst=/tmp \
     --mount=type=bind,from=ctx,source=/,target=/ctx \
     /ctx/shared/initramfs.sh
 

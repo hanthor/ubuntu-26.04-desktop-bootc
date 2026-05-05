@@ -10,6 +10,9 @@ ENV HOME=/tmp
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Recreate apt working directories wiped by bootc-rootfs.sh in the base image.
+RUN mkdir -p /var/lib/apt/lists/partial /var/lib/dpkg/updates /var/lib/dpkg/info /var/cache/apt/archives/partial
+
 # Plymouth (splash screen) + Flatpak + Flathub remote.
 # Hook stubs and kernel are already present in the base image.
 RUN --mount=type=tmpfs,dst=/tmp \

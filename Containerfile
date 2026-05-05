@@ -85,4 +85,4 @@ RUN bootc container lint
 # Clean up runtime directories left by post-install scripts.
 # Run last so bootc lint (which uses HOME=/tmp) doesn't leave debris.
 RUN find /run -mindepth 1 -maxdepth 1 ! -name 'secrets' -exec rm -rf {} + ; \
-    rm -rf /tmp/*
+    find /tmp -mindepth 1 -exec rm -rf {} + 2>/dev/null; true

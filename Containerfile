@@ -80,8 +80,9 @@ RUN printf '[Unit]\nDescription=Report bootc deployment status to serial on firs
     > /usr/lib/systemd/system/bootc-status-report.service && \
     systemctl enable --root / bootc-status-report.service
 
+RUN bootc container lint
+
 # Clean up runtime directories left by post-install scripts.
+# Run last so bootc lint (which uses HOME=/tmp) doesn't leave debris.
 RUN find /run -mindepth 1 -maxdepth 1 ! -name 'secrets' -exec rm -rf {} + ; \
     rm -rf /tmp/*
-
-RUN bootc container lint

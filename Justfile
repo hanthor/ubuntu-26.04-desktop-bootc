@@ -27,6 +27,7 @@ sudo_cmd := if `id -u` == "0" { "" } else { "sudo" }
 [group('build')]
 build:
     {{sudo_cmd}} {{container_runtime}} build \
+        ${PODMAN_EXTRA_ARGS:-} \
         --security-opt label=type:unconfined_t \
         -f Containerfile \
         -t "{{image_name}}:{{image_tag}}" .

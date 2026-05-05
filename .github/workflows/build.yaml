@@ -40,6 +40,8 @@ jobs:
 
       - name: Build image
         run: sudo $(which just) build
+        env:
+          PODMAN_EXTRA_ARGS: --platform linux/${{ matrix.platform.arch }}
 
       # ── Structure tests — run on every PR and push ─────────────────────────
       # Verifies filesystem layout, initramfs, ZFS units, masked sockets, etc.

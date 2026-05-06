@@ -59,9 +59,10 @@ jobs:
           fi
 
       - name: Build image
-        run: sudo $(which just) ${{ steps.variant.outputs.cmd }}
+        run: sudo -E BUILD_IMAGE_TAG="$BUILD_IMAGE_TAG" $(which just) ${{ steps.variant.outputs.cmd }}
         env:
           PODMAN_EXTRA_ARGS: --platform linux/${{ matrix.platform }}
+          BUILD_IMAGE_TAG: ${{ steps.variant.outputs.tag }}
           BUILD_IMAGE_TAG: ${{ steps.variant.outputs.tag }}
 
       - name: Run image structure tests
@@ -91,7 +92,7 @@ jobs:
       - name: Rechunk image
         env:
           BUILD_IMAGE_TAG: ${{ steps.variant.outputs.tag }}
-        run: sudo $(which just) rechunk
+        run: sudo -E BUILD_IMAGE_TAG="$BUILD_IMAGE_TAG" $(which just) rechunk
 
       - name: Login to GHCR
         if: github.event_name != 'pull_request'

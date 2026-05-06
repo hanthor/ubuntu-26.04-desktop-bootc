@@ -35,7 +35,7 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
 FROM docker.io/library/ubuntu:26.04 AS system
 
 # Copy bootc binary from builder
-COPY --from=builder /output/usr/bin/bootc /usr/bin/bootc
+COPY --from=builder /output/ /
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV HOME=/tmp

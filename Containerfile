@@ -46,6 +46,13 @@ ENV HOME=/tmp
 COPY --from=dpkg-state /var/lib/dpkg /var/lib/dpkg
 RUN mkdir -p /var/cache/apt/archives/partial /var/lib/apt/lists/partial /var/log/apt
 
+# Install bootc runtime dependencies first (before running bootc container lint)
+RUN apt-get update -y && \
+    apt-get install -y --no-install-recommends \
+        libostree-1-1 \
+        libzstd1 && \
+    apt-get clean -y && rm -rf /var/lib/apt/lists/*
+
 # Plymouth (splash screen) + Flatpak + Flathub remote.
 # Hook stubs and kernel are already present in the base image.
 RUN --mount=type=tmpfs,dst=/tmp \

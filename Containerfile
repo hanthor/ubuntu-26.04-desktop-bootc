@@ -54,6 +54,20 @@ RUN apt-get update -y && \
         libzstd1 && \
     apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
+# Stub out kernel/grub/kdump post-install hooks BEFORE installing packages that
+# pull in linux-generic (e.g. ubuntu-desktop-minimal). We generate the initramfs
+# ourselves with dracut in a later step.
+RUN printf '#!/bin/sh\nexit 0\n' | tee \
+        /usr/sbin/update-initramfs \
+        /usr/sbin/mkinitramfs \
+        /usr/sbin/update-grub \
+        /usr/sbin/grub-mkconfig > /dev/null && \
+    chmod +x \
+        /usr/sbin/update-initramfs \
+        /usr/sbin/mkinitramfs \
+        /usr/sbin/update-grub \
+        /usr/sbin/grub-mkconfig
+
 # Plymouth (splash screen) + Flatpak + Flathub remote.
 # Hook stubs and kernel are already present in the base image.
 RUN --mount=type=tmpfs,dst=/tmp \

@@ -49,11 +49,13 @@ RUN mkdir -p /var/cache/apt/archives/partial /var/lib/apt/lists/partial /var/log
 # Install bootc runtime dependencies first (before running bootc container lint)
 RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
+        btrfs-progs \
         curl \
         libostree-1-1 \
         libzstd1 \
         podman \
-        skopeo && \
+        skopeo \
+        xfsprogs && \
     apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
 # Stub out kernel/grub/kdump post-install hooks BEFORE installing packages that

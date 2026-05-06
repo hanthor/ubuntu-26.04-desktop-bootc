@@ -51,7 +51,9 @@ RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
         curl \
         libostree-1-1 \
-        libzstd1 && \
+        libzstd1 \
+        podman \
+        skopeo && \
     apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
 # Stub out kernel/grub/kdump post-install hooks BEFORE installing packages that
@@ -84,12 +86,15 @@ RUN --mount=type=tmpfs,dst=/tmp \
         https://dl.flathub.org/repo/flathub.flatpakrepo && \
     apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
-# Minimal GNOME 50 desktop. linux-generic is already in the base; this step
-# pulls in the desktop packages only. --force-confold avoids interactive
-# conffile prompts for the kernel hook stubs already in place.
+# Minimal GNOME 50 desktop. linux-generic is pulled in by ubuntu-desktop-minimal.
+# --force-confold avoids interactive conffile prompts for kernel hook stubs.
 RUN apt-get -o Dpkg::Options::="--force-confold" update -y && \
     apt-get -o Dpkg::Options::="--force-confold" \
         install -y --install-recommends ubuntu-desktop-minimal && \
+    # Copy vmlinuz to /usr/lib/modules/<kver>/ for bootc to find
+    KVER=$(find /usr/lib/modules -maxdepth 1 -mindepth 1 -type d | sort -V | tail -1 | xargs basename) && \
+    cp "/boot/vmlinuz-${KVER}" "/usr/lib/modules/${KVER}/vmlinuz" && \
+    rm -rf /boot/* && \
     apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
 # ZFS root support — dracut module, kernel module, userspace tools, event daemon.
@@ -118,9 +123,11 @@ RUN --mount=type=tmpfs,dst=/tmp \
     --mount=type=bind,from=ctx,source=/,target=/ctx \
     /ctx/shared/initramfs.sh
 
+# Set up the ostree/bootc filesystem layout and symlink forest.
 # Re-run bootc-rootfs.sh to wipe /var. The apt installs above wrote dpkg/apt
 # state into /var; bootc requires /var to be empty in the committed image.
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
+    echo "HOME=/var/home" | tee -a /etc/default/useradd && \
     /ctx/shared/bootc-rootfs.sh
 
 LABEL containers.bootc 1

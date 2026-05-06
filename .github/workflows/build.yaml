@@ -63,7 +63,6 @@ jobs:
         env:
           PODMAN_EXTRA_ARGS: --platform linux/${{ matrix.platform }}
           BUILD_IMAGE_TAG: ${{ steps.variant.outputs.tag }}
-          BUILD_IMAGE_TAG: ${{ steps.variant.outputs.tag }}
 
       - name: Run image structure tests
         if: steps.variant.outputs.tag == 'latest'

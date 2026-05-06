@@ -6,10 +6,36 @@ COPY shared/ /shared
 # so derived images cannot run apt without restoring the dpkg state first.
 FROM docker.io/library/ubuntu:26.04 AS dpkg-state
 
+# ── Bootc builder ────────────────────────────────────────────────────────────
+FROM docker.io/library/ubuntu:26.04 AS builder
+
+RUN --mount=type=tmpfs,dst=/tmp --mount=type=tmpfs,dst=/root --mount=type=tmpfs,dst=/boot \
+    apt-get update -y && \
+    apt-get install -y \
+        build-essential \
+        curl \
+        git \
+        go-md2man \
+        libostree-dev \
+        libzstd-dev \
+        make \
+        ostree \
+        pkgconf && \
+    apt-get clean -y && rm -rf /var/lib/apt/lists/*
+
+ENV CARGO_HOME=/tmp/rust
+ENV RUSTUP_HOME=/tmp/rust
+WORKDIR /home/build
+RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
+    curl --proto '=https' --tlsv1.2 -sSf "https://sh.rustup.rs" | sh -s -- --profile minimal -y && \
+    sh -c ". ${RUSTUP_HOME}/env ; /ctx/shared/build.sh"
+
+# ── System stage ─────────────────────────────────────────────────────────────
 # Ubuntu 26.04 LTS "Resolute Raccoon" — GNOME 50 desktop.
-# Derives from the minimal bootc base image which provides the kernel,
-# systemd-boot, dracut, bootc binary, openssh, podman, and core userspace.
 FROM docker.io/library/ubuntu:26.04 AS system
+
+# Copy bootc binary from builder
+COPY --from=builder /usr/local/bin/bootc /usr/bin/bootc
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV HOME=/tmp

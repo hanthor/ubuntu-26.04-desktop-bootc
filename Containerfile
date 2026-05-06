@@ -66,7 +66,10 @@ RUN printf '#!/bin/sh\nexit 0\n' | tee \
         /usr/sbin/update-initramfs \
         /usr/sbin/mkinitramfs \
         /usr/sbin/update-grub \
-        /usr/sbin/grub-mkconfig
+        /usr/sbin/grub-mkconfig && \
+    mkdir -p /etc/kernel/postinst.d && \
+    printf '#!/bin/sh\nexit 0\n' > /etc/kernel/postinst.d/kdump-tools && \
+    chmod +x /etc/kernel/postinst.d/kdump-tools
 
 # Plymouth (splash screen) + Flatpak + Flathub remote.
 # Hook stubs and kernel are already present in the base image.

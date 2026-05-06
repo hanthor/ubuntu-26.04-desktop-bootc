@@ -14,6 +14,15 @@ on:
     # Rebuild weekly to pick up upstream package updates
     - cron: "0 2 * * TUE"
   workflow_dispatch:
+    inputs:
+      build_variant:
+        description: 'Build variant (latest or hotfix)'
+        required: true
+        default: 'latest'
+        type: choice
+        options:
+          - latest
+          - hotfix
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
@@ -38,16 +47,29 @@ jobs:
       - name: Setup Just
         uses: extractions/setup-just@v3
 
+      - name: Determine build variant
+        id: variant
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.build_variant }}" == "hotfix" ]]; then
+            echo "cmd=build-hotfix" >> $GITHUB_OUTPUT
+            echo "tag=hotfix" >> $GITHUB_OUTPUT
+          else
+            echo "cmd=build" >> $GITHUB_OUTPUT
+            echo "tag=latest" >> $GITHUB_OUTPUT
+          fi
+
       - name: Build image
-        run: sudo $(which just) build
+        run: sudo $(which just) ${{ steps.variant.outputs.cmd }}
         env:
           PODMAN_EXTRA_ARGS: --platform linux/${{ matrix.platform }}
+          BUILD_IMAGE_TAG: ${{ steps.variant.outputs.tag }}
 
       - name: Run image structure tests
+        if: steps.variant.outputs.tag == 'latest'
         run: sudo $(which just) test-structure
 
       - name: Enable KVM
-        if: matrix.platform == 'amd64' && github.event_name != 'pull_request'
+        if: matrix.platform == 'amd64' && github.event_name != 'pull_request' && steps.variant.outputs.tag == 'latest'
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
             | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -55,15 +77,15 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Install QEMU + OVMF
-        if: matrix.platform == 'amd64' && github.event_name != 'pull_request'
+        if: matrix.platform == 'amd64' && github.event_name != 'pull_request' && steps.variant.outputs.tag == 'latest'
         run: sudo apt-get install -y --no-install-recommends qemu-system-x86 ovmf
 
       - name: Generate bootable disk image
-        if: matrix.platform == 'amd64' && github.event_name != 'pull_request'
+        if: matrix.platform == 'amd64' && github.event_name != 'pull_request' && steps.variant.outputs.tag == 'latest'
         run: sudo JUST_BIN=$(which just) BUILD_BASE_DIR=/var/tmp $(which just) generate-bootable-image
 
       - name: Boot smoke test
-        if: matrix.platform == 'amd64' && github.event_name != 'pull_request'
+        if: matrix.platform == 'amd64' && github.event_name != 'pull_request' && steps.variant.outputs.tag == 'latest'
         run: sudo BUILD_BASE_DIR=/var/tmp $(which just) test-boot
 
       - name: Rechunk image
@@ -82,13 +104,14 @@ jobs:
         id: push
         env:
           PLATFORM: ${{ matrix.platform }}
+          BUILD_TAG: ${{ steps.variant.outputs.tag }}
         run: |
           set -x
           for i in 1 2 3; do
             sudo podman push \
               --digestfile=/tmp/digestfile \
-              "${IMAGE_NAME}:latest" \
-              "${IMAGE_REGISTRY}/${IMAGE_NAME}:latest-${PLATFORM}" && break \
+              "${IMAGE_NAME}:${BUILD_TAG}" \
+              "${IMAGE_REGISTRY}/${IMAGE_NAME}:${BUILD_TAG}-${PLATFORM}" && break \
               || sleep $((5 * i))
           done
           echo "digest=$(< /tmp/digestfile)" >> "${GITHUB_OUTPUT}"
@@ -134,6 +157,15 @@ jobs:
       image: docker.io/library/alpine:latest
       options: --privileged
     steps:
+      - name: Determine manifest tag
+        id: manifest_tag
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.build_variant }}" == "hotfix" ]]; then
+            echo "tag=hotfix" >> $GITHUB_OUTPUT
+          else
+            echo "tag=latest" >> $GITHUB_OUTPUT
+          fi
+
       - name: Install tools
         run: |
           apk add bash coreutils podman
@@ -158,6 +190,7 @@ jobs:
         env:
           IMAGE_REGISTRY: ${{ env.IMAGE_REGISTRY }}
           IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          MANIFEST_TAG: ${{ steps.manifest_tag.outputs.tag }}
         run: |
           set -x
           TARGET="${IMAGE_REGISTRY}/${IMAGE_NAME}"
@@ -168,5 +201,8 @@ jobs:
             DIGEST="$(cat "${digest_file}")"
             podman manifest add "${TARGET}" "${TARGET}@${DIGEST}" --arch "${PLATFORM}"
           done
-          podman manifest push --all=false "${TARGET}" "${TARGET}:latest"
-          podman manifest push --all=false "${TARGET}" "${TARGET}:${DATE}"
+          podman manifest push --all=false "${TARGET}" "${TARGET}:${MANIFEST_TAG}"
+          # Also push dated tag for latest builds
+          if [[ "${MANIFEST_TAG}" == "latest" ]]; then
+            podman manifest push --all=false "${TARGET}" "${TARGET}:${DATE}"
+          fi

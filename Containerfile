@@ -149,3 +149,25 @@ RUN bootc container lint
 # Run last so bootc lint (which uses HOME=/tmp) doesn't leave debris.
 RUN find /run -mindepth 1 -maxdepth 1 ! -name 'secrets' -exec rm -rf {} + ; \
     find /tmp -mindepth 1 -exec rm -rf {} + 2>/dev/null; true
+
+# ── Optional hotfix stage ────────────────────────────────────────────────────
+# This stage applies the fs-verity regression hotfix for kernel 7.0.
+# Build with: podman build -f Containerfile --target hotfix ...
+#
+# NOTE: This stage does NOT rebuild the kernel (45-90 min overhead).
+# Instead, it adds documentation and patches for users to manually apply
+# if needed. For most deployments, wait for Ubuntu kernel backport (~1-2 weeks).
+FROM system AS hotfix
+
+# Add the overlayfs patch and hotfix documentation
+COPY --from=ctx shared/patch-overlayfs.sh /usr/local/bin/
+COPY --from=ctx HOTFIX-VERITY.md /usr/share/doc/ubuntu-bootc/
+
+RUN chmod +x /usr/local/bin/patch-overlayfs.sh
+
+# Mark this image as hotfix-ready
+RUN echo "BOOTC_HOTFIX=fs-verity-overlayfs" > /etc/bootc-hotfix.txt
+
+LABEL org.opencontainers.image.title="Ubuntu 26.04 Desktop Bootc (fs-verity hotfix)" \
+      org.opencontainers.image.description="GNOME desktop bootc image with fs-verity overlayfs hotfix documentation" \
+      org.opencontainers.image.version="26.04-hotfix"

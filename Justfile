@@ -26,7 +26,7 @@ sudo_cmd := if `id -u` == "0" { "" } else { "sudo" }
 # Build the bootc container image
 [group('build')]
 build:
-    {{sudo_cmd}} {{container_runtime}} build \
+    {{sudo_cmd}} {{container_runtime}} build --authfile /root/.config/containers/auth.json \
         ${PODMAN_EXTRA_ARGS:-} \
         --security-opt label=type:unconfined_t \
         -f Containerfile \

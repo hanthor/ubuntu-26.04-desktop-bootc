@@ -51,10 +51,13 @@ RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
         btrfs-progs \
         curl \
+        dosfstools \
         libostree-1-1 \
         libzstd1 \
         podman \
         skopeo \
+        systemd-boot \
+        systemd-boot-efi \
         xfsprogs && \
     apt-get clean -y && rm -rf /var/lib/apt/lists/*
 

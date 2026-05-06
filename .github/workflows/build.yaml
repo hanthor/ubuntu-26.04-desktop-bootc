@@ -48,7 +48,12 @@ jobs:
             -u "oauth2accesstoken" --password-stdin \
             --authfile /root/.config/containers/auth.json ghcr.io
 
-      - name: Build image
+      - name: Pre-pull base image
+        run: |
+          sudo podman pull --authfile /root/.config/containers/auth.json \
+            ghcr.io/ubuntu-bootc/ubuntu-26.04-bootc:latest
+
+            - name: Build image
         run: sudo $(which just) build
         env:
           PODMAN_EXTRA_ARGS: --platform linux/${{ matrix.platform }}

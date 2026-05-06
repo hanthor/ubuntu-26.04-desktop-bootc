@@ -38,39 +38,13 @@ jobs:
       - name: Setup Just
         uses: extractions/setup-just@v3
 
-      - name: Login to GHCR
-        if: github.event_name != 'pull_request'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          mkdir -p /etc/containers
-          echo "${GITHUB_TOKEN}" | sudo podman login \
-            -u "oauth2accesstoken" --password-stdin \
-            --authfile /root/.config/containers/auth.json ghcr.io
-
-      - name: Pre-pull base image
-        if: github.event_name != 'pull_request'
-        run: |
-          sudo podman pull --authfile /root/.config/containers/auth.json \
-            ghcr.io/ubuntu-bootc/ubuntu-26.04-bootc:latest
-
       - name: Build image
         run: sudo $(which just) build
         env:
           PODMAN_EXTRA_ARGS: --platform linux/${{ matrix.platform }}
 
-      # ── Structure tests — run on every PR and push ─────────────────────────
-      # Verifies filesystem layout, initramfs, ZFS units, masked sockets, etc.
-      # Fast (~5s). Reproducible locally with: just test-structure
       - name: Run image structure tests
         run: sudo $(which just) test-structure
-
-      # ── Boot smoke test — amd64 non-PR builds only ─────────────────────────
-      # Creates a real disk image via bootc install and boots it in QEMU KVM,
-      # verifying the system reaches a login prompt within 4 minutes.
-      # Skipped on PRs to keep review feedback fast; runs on merge to main
-      # and on the weekly schedule so regressions are caught quickly.
-      # Reproducible locally with: just generate-bootable-image && just test-boot
 
       - name: Enable KVM
         if: matrix.platform == 'amd64' && github.event_name != 'pull_request'
@@ -92,10 +66,16 @@ jobs:
         if: matrix.platform == 'amd64' && github.event_name != 'pull_request'
         run: sudo BUILD_BASE_DIR=/var/tmp $(which just) test-boot
 
-      # ── Publish ────────────────────────────────────────────────────────────
-
       - name: Rechunk image
         run: sudo $(which just) rechunk
+
+      - name: Login to GHCR
+        if: github.event_name != 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "${GITHUB_TOKEN}" | sudo podman login \
+            -u "oauth2accesstoken" --password-stdin ghcr.io
 
       - name: Push to GHCR
         if: github.event_name != 'pull_request'
@@ -106,7 +86,6 @@ jobs:
           set -x
           for i in 1 2 3; do
             sudo podman push \
-              --authfile /root/.config/containers/auth.json \
               --digestfile=/tmp/digestfile \
               "${IMAGE_NAME}:latest" \
               "${IMAGE_REGISTRY}/${IMAGE_NAME}:latest-${PLATFORM}" && break \
@@ -120,7 +99,7 @@ jobs:
 
       - name: Sign image
         if: github.event_name != 'pull_request'
-        continue-on-error: true   # non-fatal: fails gracefully if SIGNING_SECRET not set
+        continue-on-error: true
         env:
           DIGEST: ${{ steps.push.outputs.digest }}
           COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
@@ -158,7 +137,6 @@ jobs:
       - name: Install tools
         run: |
           apk add bash coreutils podman
-          # podman needs vfs driver when running inside a container (overlayfs not supported over overlayfs)
           mkdir -p /etc/containers
           printf '[storage]\ndriver = "vfs"\n' > /etc/containers/storage.conf
 
@@ -183,12 +161,12 @@ jobs:
         run: |
           set -x
           TARGET="${IMAGE_REGISTRY}/${IMAGE_NAME}"
+          DATE="$(date -u +%Y%m%d)"
           podman manifest create "${TARGET}"
           for digest_file in /tmp/digests/*.txt; do
             PLATFORM="$(basename "${digest_file}" .txt)"
             DIGEST="$(cat "${digest_file}")"
             podman manifest add "${TARGET}" "${TARGET}@${DIGEST}" --arch "${PLATFORM}"
           done
-          DATE="$(date -u +%Y%m%d)"
           podman manifest push --all=false "${TARGET}" "${TARGET}:latest"
           podman manifest push --all=false "${TARGET}" "${TARGET}:${DATE}"

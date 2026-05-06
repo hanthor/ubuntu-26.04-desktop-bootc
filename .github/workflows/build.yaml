@@ -45,7 +45,7 @@ jobs:
         run: |
           mkdir -p /etc/containers
           echo "${GITHUB_TOKEN}" | sudo podman login \
-            -u "${{ github.actor }}" --password-stdin \
+            -u "oauth2accesstoken" --password-stdin \
             --authfile /etc/containers/auth.json ghcr.io
 
       - name: Build image
@@ -168,7 +168,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "${GITHUB_TOKEN}" | podman login \
-            -u "${{ github.actor }}" --password-stdin ghcr.io
+            -u "oauth2accesstoken" --password-stdin ghcr.io
 
       - name: Create and push manifest
         env:

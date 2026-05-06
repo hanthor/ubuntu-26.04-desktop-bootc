@@ -32,18 +32,6 @@ build:
         -f Containerfile \
         -t "{{image_name}}:{{image_tag}}" .
 
-# Build the fs-verity hotfix variant (tags as :hotfix)
-# This adds hotfix documentation and patch scripts to the standard image.
-# NOTE: Does NOT rebuild the kernel. For full kernel rebuild, see HOTFIX-VERITY.md
-[group('build')]
-build-hotfix:
-    {{sudo_cmd}} {{container_runtime}} build \
-        ${PODMAN_EXTRA_ARGS:-} \
-        --security-opt label=type:unconfined_t \
-        --target hotfix \
-        -f Containerfile \
-        -t "{{image_name}}:hotfix" .
-
 # Re-chunk the image for efficient OCI layer distribution
 [group('build')]
 rechunk:

@@ -49,11 +49,12 @@ jobs:
             --authfile /root/.config/containers/auth.json ghcr.io
 
       - name: Pre-pull base image
+        if: github.event_name != 'pull_request'
         run: |
           sudo podman pull --authfile /root/.config/containers/auth.json \
             ghcr.io/ubuntu-bootc/ubuntu-26.04-bootc:latest
 
-            - name: Build image
+      - name: Build image
         run: sudo $(which just) build
         env:
           PODMAN_EXTRA_ARGS: --platform linux/${{ matrix.platform }}

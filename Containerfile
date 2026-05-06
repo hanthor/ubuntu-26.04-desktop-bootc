@@ -86,11 +86,11 @@ RUN --mount=type=tmpfs,dst=/tmp \
         https://dl.flathub.org/repo/flathub.flatpakrepo && \
     apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
-# Minimal GNOME 50 desktop. linux-generic is pulled in by ubuntu-desktop-minimal.
-# --force-confold avoids interactive conffile prompts for kernel hook stubs.
+# Install kernel explicitly (hooks are stubbed so post-install scripts are no-ops).
+# Then install GNOME 50 desktop. --force-confold avoids interactive conffile prompts.
 RUN apt-get -o Dpkg::Options::="--force-confold" update -y && \
     apt-get -o Dpkg::Options::="--force-confold" \
-        install -y --install-recommends ubuntu-desktop-minimal && \
+        install -y --install-recommends linux-generic ubuntu-desktop-minimal && \
     # Copy vmlinuz to /usr/lib/modules/<kver>/ for bootc to find
     KVER=$(find /usr/lib/modules -maxdepth 1 -mindepth 1 -type d | sort -V | tail -1 | xargs basename) && \
     cp "/boot/vmlinuz-${KVER}" "/usr/lib/modules/${KVER}/vmlinuz" && \

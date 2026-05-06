@@ -89,6 +89,8 @@ jobs:
         run: sudo BUILD_BASE_DIR=/var/tmp $(which just) test-boot
 
       - name: Rechunk image
+        env:
+          BUILD_IMAGE_TAG: ${{ steps.variant.outputs.tag }}
         run: sudo $(which just) rechunk
 
       - name: Login to GHCR

@@ -1,5 +1,6 @@
 FROM scratch AS ctx
 COPY shared/ /shared
+COPY HOTFIX-VERITY.md /
 
 # Provides a pristine dpkg/apt database to restore in the system stage.
 # bootc-rootfs.sh in the base image wiped /var (including /var/lib/dpkg),
